@@ -1,0 +1,31 @@
+name: Build EC Choir (macOS)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (AU + VST3, universal arm64/x86_64)
+        run: cmake --build build --config Release -j 4
+
+      - name: Package and sign (ad-hoc)
+        run: |
+          mkdir -p dist out
+          find build -maxdepth 6 \( -name "*.vst3" -o -name "*.component" \) -exec cp -R {} dist/ \;
+          for f in dist/*; do codesign --force --deep -s - "$f"; done
+          cd dist
+          for f in *; do ditto -c -k --keepParent "$f" "../out/$f.zip"; done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EC-Choir-macOS
+          path: out/*.zip
